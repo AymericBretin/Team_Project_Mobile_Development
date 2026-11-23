@@ -6,9 +6,9 @@ import pg from 'pg';
 pg.types.setTypeParser(1700, parseFloat);
 pg.types.setTypeParser(1082, (value: string) => value);
 
-export const db = new pg.Pool({
-  connectionString: process.env.DATABASE_URL ?? 'postgres://mybudget:mybudget@localhost:5432/mybudget',
-});
+if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+
+export const db = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 await db.query(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'));
 
 const ACCESS_TOKEN_TTL = 15 * 60;
