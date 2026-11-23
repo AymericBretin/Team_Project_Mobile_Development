@@ -60,7 +60,6 @@ test('register, login, refresh rotation and logout follow the app contract', asy
   assert.equal((await call('POST', '/auth/logout', undefined, { refreshToken: refreshed.body.refreshToken })).status, 204);
   assert.equal((await call('GET', '/expenses', refreshed.body.accessToken)).status, 401);
   assert.equal((await call('POST', '/auth/refresh', undefined, { refreshToken: refreshed.body.refreshToken })).status, 401);
-  // The other session (from register) is untouched.
   assert.equal((await call('GET', '/expenses', registered.body.accessToken)).status, 200);
 });
 

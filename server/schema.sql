@@ -1,5 +1,3 @@
--- Applied at every server start, so every statement must be idempotent.
-
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
@@ -7,8 +5,6 @@ CREATE TABLE IF NOT EXISTS users (
   display_name TEXT
 );
 
--- One row per logged-in device. A refresh replaces the row, so old tokens stop working.
--- shortcut: expired rows are never deleted, add a periodic cleanup if the table grows too much
 CREATE TABLE IF NOT EXISTS sessions (
   id SERIAL PRIMARY KEY,
   user_id INT NOT NULL REFERENCES users ON DELETE CASCADE,
@@ -40,7 +36,6 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   next_date DATE NOT NULL
 );
 
--- A budget with a NULL category is the overall monthly budget, otherwise it is a per-category limit.
 CREATE TABLE IF NOT EXISTS budgets (
   id SERIAL PRIMARY KEY,
   user_id INT NOT NULL REFERENCES users ON DELETE CASCADE,

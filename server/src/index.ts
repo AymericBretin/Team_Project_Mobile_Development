@@ -3,7 +3,6 @@ import { readFileSync } from 'node:fs';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import pg from 'pg';
 
-// Send NUMERIC (1700) as JSON numbers and DATE (1082) as 'YYYY-MM-DD' instead of timezone-shifted JS Dates.
 pg.types.setTypeParser(1700, parseFloat);
 pg.types.setTypeParser(1082, (value: string) => value);
 
@@ -12,7 +11,7 @@ export const db = new pg.Pool({
 });
 await db.query(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8'));
 
-const ACCESS_TOKEN_TTL = 15 * 60; // seconds
+const ACCESS_TOKEN_TTL = 15 * 60;
 const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60;
 
 const httpError = (status: number, code: string, message: string) => Object.assign(new Error(message), { status, code });
@@ -32,7 +31,6 @@ async function checkPassword(password: string, stored: string) {
   return timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(await scryptHex(password, salt), 'hex'));
 }
 
-// Same rules as the app's CredentialsValidator.
 function credentials(body: any) {
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
   const password = body?.password;
@@ -87,7 +85,6 @@ app.post('/auth/login', async (req, res) => {
 });
 
 app.post('/auth/refresh', async (req, res) => {
-  // Deleting the session invalidates both old tokens; only one of two concurrent refreshes can win.
   const { rows } = await db.query(
     `DELETE FROM sessions s USING users u
      WHERE s.refresh_token = $1 AND s.refresh_expires_at > now() AND u.id = s.user_id
@@ -98,13 +95,11 @@ app.post('/auth/refresh', async (req, res) => {
   res.json(await newSession(rows[0]));
 });
 
-// Needs no access token: the refresh token alone proves the session, and the app ignores failures.
 app.post('/auth/logout', async (req, res) => {
   await db.query('DELETE FROM sessions WHERE refresh_token = $1', [req.body?.refreshToken]);
   res.sendStatus(204);
 });
 
-// Every route below requires `Authorization: Bearer <accessToken>`, and answers 401 so the app refreshes it.
 app.use(async (req, res, next) => {
   const token = req.get('authorization')?.replace(/^Bearer /, '');
   const { rows } = await db.query(
@@ -118,9 +113,6 @@ app.use(async (req, res, next) => {
 
 const camelCase = (column: string) => column.replace(/_(\w)/g, (_, letter: string) => letter.toUpperCase());
 
-// CRUD on a table whose rows belong to the logged-in user. JSON fields are the camelCase column names.
-// Only the whitelisted column names reach the SQL text; values always go through parameters,
-// and the table constraints in schema.sql do the validation.
 function crud(table: string, columns: string[]) {
   const router = express.Router();
   const output = ['id', ...columns].map((c) => `${c} AS "${camelCase(c)}"`).join(', ');
@@ -172,9 +164,7 @@ app.use('/expenses', crud('expenses', ['title', 'amount', 'currency', 'category'
 app.use('/subscriptions', crud('subscriptions', ['name', 'amount', 'currency', 'category', 'period', 'next_date']));
 app.use('/budgets', crud('budgets', ['category', 'amount', 'currency']));
 
-// Errors follow the app's format: { code, message }.
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  // Postgres error classes 22 (bad value) and 23 (constraint violation) mean the client sent bad data.
   if (err instanceof pg.DatabaseError && /^2[23]/.test(err.code ?? '')) {
     err = httpError(400, 'VALIDATION_ERROR', err.message);
   }
