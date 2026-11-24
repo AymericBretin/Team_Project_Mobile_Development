@@ -1,5 +1,10 @@
 package com.example.mybudget.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -11,14 +16,21 @@ import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -26,10 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mybudget.data.auth.AuthState
 import com.example.mybudget.data.auth.User
+import com.example.mybudget.data.finance.DataError
 import com.example.mybudget.ui.auth.AuthScreen
 import com.example.mybudget.ui.auth.AuthViewModel
 import com.example.mybudget.ui.auth.SplashScreen
@@ -84,21 +98,43 @@ fun AppRoot(authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Fac
 @Composable
 private fun MainShell(user: User, onLogout: () -> Unit) {
     // Keyed by user so that logging in as someone else starts from a fresh ViewModel, not the previous user's data.
-    val vm: BudgetViewModel = viewModel(key = "budget-${user.id}")
+    val vm: BudgetViewModel = viewModel(key = "budget-${user.id}", factory = BudgetViewModel.Factory)
     val expenses by vm.expenses.collectAsStateWithLifecycle()
     val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
     val budgets by vm.budgets.collectAsStateWithLifecycle()
+    val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+    val isBusy by vm.isBusy.collectAsStateWithLifecycle()
+    val message by vm.message.collectAsStateWithLifecycle()
 
     var tab by rememberSaveable { mutableStateOf(Tab.Home) }
     var editor by remember { mutableStateOf<Editor?>(null) }
+    val snackbar = remember { SnackbarHostState() }
+
+    LaunchedEffect(message) {
+        val shown = message ?: return@LaunchedEffect
+        val result = snackbar.showSnackbar(
+            message = shown.error.message(),
+            actionLabel = if (shown.isLoadError) "Retry" else null,
+            duration = if (shown.isLoadError) SnackbarDuration.Long else SnackbarDuration.Short,
+        )
+        vm.messageShown()
+        if (result == SnackbarResult.ActionPerformed) vm.refresh()
+    }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(if (tab == Tab.Home) "My Budget" else tab.title) },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
-            )
+            Column {
+                TopAppBar(
+                    title = { Text(if (tab == Tab.Home) "My Budget" else tab.title) },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                )
+                // Saves and deletes in progress. Space is always reserved so the content doesn't jump.
+                Box(Modifier.fillMaxWidth().height(2.dp)) {
+                    if (isBusy && !isRefreshing) LinearProgressIndicator(Modifier.fillMaxWidth())
+                }
+            }
         },
+        snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
             NavigationBar {
                 Tab.entries.forEach { t ->
@@ -128,22 +164,24 @@ private fun MainShell(user: User, onLogout: () -> Unit) {
         },
         containerColor = MaterialTheme.colorScheme.background,
     ) { padding ->
-        val content = Modifier.padding(padding)
-        when (tab) {
-            Tab.Home -> DashboardScreen(
-                greetingName = user.displayName,
-                expenses = expenses,
-                subscriptions = subscriptions,
-                budgets = budgets,
-                onSeeAllExpenses = { tab = Tab.Expenses },
-                onSeeSubscriptions = { tab = Tab.Bills },
-                onExpenseClick = { editor = Editor.ForExpense(it) },
-                modifier = content,
-            )
-            Tab.Expenses -> ExpensesScreen(expenses, onExpenseClick = { editor = Editor.ForExpense(it) }, modifier = content)
-            Tab.Bills -> SubscriptionsScreen(subscriptions, onClick = { editor = Editor.ForSubscription(it) }, modifier = content)
-            Tab.Budgets -> BudgetsScreen(budgets, expenses, onClick = { editor = Editor.ForBudget(it) }, modifier = content)
-            Tab.Profile -> ProfileScreen(user, onLogout, modifier = content)
+        val content = Modifier.fillMaxSize()
+        PullToRefreshBox(isRefreshing = isRefreshing, onRefresh = vm::refresh, modifier = Modifier.padding(padding)) {
+            when (tab) {
+                Tab.Home -> DashboardScreen(
+                    greetingName = user.displayName,
+                    expenses = expenses,
+                    subscriptions = subscriptions,
+                    budgets = budgets,
+                    onSeeAllExpenses = { tab = Tab.Expenses },
+                    onSeeSubscriptions = { tab = Tab.Bills },
+                    onExpenseClick = { editor = Editor.ForExpense(it) },
+                    modifier = content,
+                )
+                Tab.Expenses -> ExpensesScreen(expenses, onExpenseClick = { editor = Editor.ForExpense(it) }, modifier = content)
+                Tab.Bills -> SubscriptionsScreen(subscriptions, onClick = { editor = Editor.ForSubscription(it) }, modifier = content)
+                Tab.Budgets -> BudgetsScreen(budgets, expenses, onClick = { editor = Editor.ForBudget(it) }, modifier = content)
+                Tab.Profile -> ProfileScreen(user, onLogout, modifier = content)
+            }
         }
     }
 
@@ -153,4 +191,12 @@ private fun MainShell(user: User, onLogout: () -> Unit) {
         is Editor.ForSubscription -> SubscriptionEditorSheet(e.item, vm::saveSubscription, { vm.deleteSubscription(it.id) }, { editor = null })
         is Editor.ForBudget -> BudgetEditorSheet(e.item, budgets, vm::saveBudget, { vm.deleteBudget(it.id) }, { editor = null })
     }
+}
+
+private fun DataError.message(): String = when (this) {
+    is DataError.Validation -> message ?: "Please check your details"
+    DataError.NotFound -> "This item no longer exists"
+    DataError.SessionExpired -> "Your session has expired, please log in again"
+    DataError.Network -> "No internet connection"
+    DataError.Server, is DataError.Unknown -> "Something went wrong, please try again"
 }

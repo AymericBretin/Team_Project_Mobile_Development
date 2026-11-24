@@ -5,6 +5,9 @@ import com.example.mybudget.data.auth.AuthRepository
 import com.example.mybudget.data.auth.DefaultAuthRepository
 import com.example.mybudget.data.auth.local.EncryptedSessionStorage
 import com.example.mybudget.data.auth.remote.AuthApi
+import com.example.mybudget.data.finance.DefaultFinanceRepository
+import com.example.mybudget.data.finance.FinanceRepository
+import com.example.mybudget.data.finance.remote.FinanceApi
 import com.example.mybudget.data.network.HttpClients
 import retrofit2.Retrofit
 import retrofit2.create
@@ -33,5 +36,11 @@ class AppContainer(context: Context) {
      */
     val authenticatedRetrofit: Retrofit = HttpClients.retrofit(
         HttpClients.authenticated(baseClient, defaultAuthRepository),
+        json = HttpClients.apiJson,
+    )
+
+    val financeRepository: FinanceRepository = DefaultFinanceRepository(
+        api = authenticatedRetrofit.create<FinanceApi>(),
+        json = HttpClients.json,
     )
 }

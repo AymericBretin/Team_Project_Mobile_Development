@@ -17,6 +17,12 @@ object HttpClients {
         explicitNulls = false
     }
 
+    /**
+     * For the business APIs (see `authenticatedRetrofit`): nulls are sent, so that a PUT can clear a field
+     * (e.g. remove the category of an expense). The server only updates the fields present in the body.
+     */
+    val apiJson = Json(json) { explicitNulls = true }
+
     /** Base client, no auth. Used as-is for the `auth/...` endpoints. */
     fun base(): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -40,9 +46,10 @@ object HttpClients {
         .authenticator(TokenAuthenticator(tokenProvider))
         .build()
 
-    fun retrofit(client: OkHttpClient, baseUrl: String = BuildConfig.API_BASE_URL): Retrofit = Retrofit.Builder()
-        .baseUrl(baseUrl)
-        .client(client)
-        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-        .build()
+    fun retrofit(client: OkHttpClient, baseUrl: String = BuildConfig.API_BASE_URL, json: Json = this.json): Retrofit =
+        Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
 }
