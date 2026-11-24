@@ -83,8 +83,8 @@ fun AppRoot(authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Fac
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainShell(user: User, onLogout: () -> Unit) {
-    // NOTE: scoped to the Activity. Once this talks to the real API, reset/reload it when the user changes.
-    val vm: BudgetViewModel = viewModel()
+    // Keyed by user so that logging in as someone else starts from a fresh ViewModel, not the previous user's data.
+    val vm: BudgetViewModel = viewModel(key = "budget-${user.id}")
     val expenses by vm.expenses.collectAsStateWithLifecycle()
     val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
     val budgets by vm.budgets.collectAsStateWithLifecycle()

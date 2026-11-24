@@ -30,6 +30,7 @@ import com.example.mybudget.ui.components.AmountField
 import com.example.mybudget.ui.components.DateField
 import com.example.mybudget.ui.components.DropdownField
 import com.example.mybudget.ui.components.toAmountOrNull
+import com.example.mybudget.ui.components.toAmountText
 import com.example.mybudget.ui.model.DefaultCategories
 import com.example.mybudget.ui.model.Expense
 import com.example.mybudget.ui.model.SupportedCurrencies
@@ -45,7 +46,7 @@ fun ExpenseEditorSheet(
     onDismiss: () -> Unit,
 ) {
     var title by remember { mutableStateOf(initial?.title.orEmpty()) }
-    var amount by remember { mutableStateOf(initial?.amount?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() }.orEmpty()) }
+    var amount by remember { mutableStateOf(initial?.amount?.toAmountText().orEmpty()) }
     var currency by remember { mutableStateOf(initial?.currency ?: "EUR") }
     var category by remember { mutableStateOf(initial?.category) }
     var tags by remember { mutableStateOf(initial?.tags?.joinToString(", ").orEmpty()) }

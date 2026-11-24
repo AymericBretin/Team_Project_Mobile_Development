@@ -41,6 +41,7 @@ fun <T> DropdownField(
     modifier: Modifier = Modifier,
     allowNone: Boolean = false,
     noneLabel: String = "None",
+    isError: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = modifier) {
@@ -48,6 +49,7 @@ fun <T> DropdownField(
             value = value?.let(display) ?: if (allowNone) noneLabel else "",
             onValueChange = {},
             readOnly = true,
+            isError = isError,
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
             modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
@@ -78,6 +80,9 @@ fun AmountField(value: String, onValueChange: (String) -> Unit, modifier: Modifi
 }
 
 fun String.toAmountOrNull(): Double? = replace(',', '.').toDoubleOrNull()?.takeIf { it > 0 }
+
+/** Initial text of an [AmountField]: plain notation, no trailing zeros ("10", "13.99", never "1.0E7"). */
+fun Double.toAmountText(): String = toBigDecimal().stripTrailingZeros().toPlainString()
 
 /** Read-only field that opens a Material date picker. */
 @OptIn(ExperimentalMaterial3Api::class)

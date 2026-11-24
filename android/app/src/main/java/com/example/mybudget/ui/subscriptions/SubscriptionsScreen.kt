@@ -43,6 +43,7 @@ import com.example.mybudget.ui.components.EmptyState
 import com.example.mybudget.ui.components.formatDay
 import com.example.mybudget.ui.components.formatMoney
 import com.example.mybudget.ui.components.toAmountOrNull
+import com.example.mybudget.ui.components.toAmountText
 import com.example.mybudget.ui.model.DefaultCategories
 import com.example.mybudget.ui.model.Period
 import com.example.mybudget.ui.model.SupportedCurrencies
@@ -115,7 +116,7 @@ fun SubscriptionEditorSheet(
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name.orEmpty()) }
-    var amount by remember { mutableStateOf(initial?.amount?.toString().orEmpty()) }
+    var amount by remember { mutableStateOf(initial?.amount?.toAmountText().orEmpty()) }
     var currency by remember { mutableStateOf(initial?.currency ?: "EUR") }
     var category by remember { mutableStateOf(initial?.category ?: "Subscriptions") }
     var period by remember { mutableStateOf(initial?.period ?: Period.MONTHLY) }

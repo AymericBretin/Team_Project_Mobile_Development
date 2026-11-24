@@ -41,11 +41,12 @@ import com.example.mybudget.ui.components.DropdownField
 import com.example.mybudget.ui.components.EmptyState
 import com.example.mybudget.ui.components.formatMoney
 import com.example.mybudget.ui.components.toAmountOrNull
+import com.example.mybudget.ui.components.toAmountText
 import com.example.mybudget.ui.model.Budget
 import com.example.mybudget.ui.model.DefaultCategories
 import com.example.mybudget.ui.model.Expense
 import com.example.mybudget.ui.model.SupportedCurrencies
-import com.example.mybudget.ui.model.ExchangeRates
+import com.example.mybudget.ui.model.amountEur
 import com.example.mybudget.ui.model.inMonth
 import com.example.mybudget.ui.model.totalEur
 import java.time.YearMonth
@@ -67,8 +68,7 @@ fun BudgetsScreen(
         items(budgets.sortedBy { it.category != null }, key = { it.id }) { budget ->
             val spent = if (budget.category == null) monthExpenses.totalEur()
             else monthExpenses.filter { it.category == budget.category }.totalEur()
-            val limitEur = ExchangeRates.toEur(budget.amount, budget.currency)
-            val progress = (spent / limitEur).toFloat()
+            val progress = (spent / budget.amountEur()).toFloat()
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -102,7 +102,7 @@ fun BudgetEditorSheet(
     onDismiss: () -> Unit,
 ) {
     var category by remember { mutableStateOf(initial?.category) }
-    var amount by remember { mutableStateOf(initial?.amount?.let { if (it % 1.0 == 0.0) it.toLong().toString() else it.toString() }.orEmpty()) }
+    var amount by remember { mutableStateOf(initial?.amount?.toAmountText().orEmpty()) }
     var currency by remember { mutableStateOf(initial?.currency ?: "EUR") }
     var showErrors by remember { mutableStateOf(false) }
 
@@ -110,6 +110,7 @@ fun BudgetEditorSheet(
     val taken = existing.filter { it.id != initial?.id }.mapNotNull { it.category }.toSet()
     val globalTaken = existing.any { it.id != initial?.id && it.category == null }
     val available = DefaultCategories.filterNot { it in taken }
+    val missingCategory = category == null && globalTaken
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         Column(
@@ -117,7 +118,18 @@ fun BudgetEditorSheet(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(if (initial == null) "New budget" else "Edit budget", style = MaterialTheme.typography.titleLarge)
-            DropdownField("Applies to", category, available, { it }, { category = it }, allowNone = !globalTaken, noneLabel = "All spending (monthly)")
+            DropdownField(
+                "Applies to", category, available, { it }, { category = it },
+                allowNone = !globalTaken, noneLabel = "All spending (monthly)", isError = showErrors && missingCategory,
+            )
+            if (missingCategory && (showErrors || available.isEmpty())) {
+                Text(
+                    if (available.isEmpty()) "Every category already has a budget. Edit an existing one instead."
+                    else "You already have a monthly budget. Pick a category.",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AmountField(amount, { amount = it }, Modifier.weight(1.4f), isError = showErrors && amount.toAmountOrNull() == null)
                 DropdownField("Currency", currency, SupportedCurrencies, { it }, { currency = it ?: "EUR" }, Modifier.weight(1f))
@@ -126,7 +138,7 @@ fun BudgetEditorSheet(
             Button(
                 onClick = {
                     val value = amount.toAmountOrNull()
-                    if (value == null || (category == null && globalTaken)) showErrors = true
+                    if (value == null || missingCategory) showErrors = true
                     else {
                         onSave(Budget(initial?.id ?: 0, category, value, currency))
                         onDismiss()

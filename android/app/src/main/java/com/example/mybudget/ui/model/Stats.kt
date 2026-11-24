@@ -10,9 +10,15 @@ import java.time.YearMonth
 object ExchangeRates {
     private val toEur = mapOf("EUR" to 1.0, "KRW" to 0.000664, "USD" to 0.92, "GBP" to 1.17, "JPY" to 0.0061)
     fun toEur(amount: Double, currency: String): Double = amount * (toEur[currency] ?: 1.0)
+    fun fromEur(amount: Double, currency: String): Double = amount / (toEur[currency] ?: 1.0)
 }
 
 fun Expense.amountEur() = ExchangeRates.toEur(amount, currency)
+
+fun Budget.amountEur() = ExchangeRates.toEur(amount, currency)
+
+/** What is left of this budget once [spentEur] is spent, in the budget's own currency. Negative when over budget. */
+fun Budget.remaining(spentEur: Double) = amount - ExchangeRates.fromEur(spentEur, currency)
 
 fun List<Expense>.inMonth(month: YearMonth) = filter { YearMonth.from(it.date) == month }
 

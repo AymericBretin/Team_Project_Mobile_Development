@@ -39,10 +39,12 @@ import com.example.mybudget.ui.components.formatMoney
 import com.example.mybudget.ui.model.Budget
 import com.example.mybudget.ui.model.Expense
 import com.example.mybudget.ui.model.Subscription
+import com.example.mybudget.ui.model.amountEur
 import com.example.mybudget.ui.model.byCategory
 import com.example.mybudget.ui.model.daysUntilNext
 import com.example.mybudget.ui.model.global
 import com.example.mybudget.ui.model.inMonth
+import com.example.mybudget.ui.model.remaining
 import com.example.mybudget.ui.model.totalEur
 import com.example.mybudget.ui.theme.DeepGreen
 import com.example.mybudget.ui.theme.Mint
@@ -96,8 +98,8 @@ fun DashboardScreen(
                     Text(formatMoney(spent, "EUR"), style = MaterialTheme.typography.displaySmall, color = Color.White)
                     if (budget != null) {
                         Spacer(Modifier.height(4.dp))
-                        BudgetBar((spent / budget.amount).toFloat(), trackColor = Color.White.copy(alpha = 0.2f))
-                        val left = budget.amount - spent
+                        BudgetBar((spent / budget.amountEur()).toFloat(), trackColor = Color.White.copy(alpha = 0.2f))
+                        val left = budget.remaining(spent)
                         Text(
                             if (left >= 0) "${formatMoney(left, budget.currency)} left of ${formatMoney(budget.amount, budget.currency)}"
                             else "${formatMoney(-left, budget.currency)} over your ${formatMoney(budget.amount, budget.currency)} budget",
@@ -140,12 +142,13 @@ fun DashboardScreen(
                                     val d = sub.daysUntilNext()
                                     Text(
                                         when {
-                                            d <= 0 -> "Due today"
+                                            d < 0 -> "Overdue"
+                                            d == 0L -> "Due today"
                                             d == 1L -> "Tomorrow"
                                             else -> "In $d days"
                                         },
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (d < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                                 Text(formatMoney(sub.amount, sub.currency), style = MaterialTheme.typography.titleMedium)
