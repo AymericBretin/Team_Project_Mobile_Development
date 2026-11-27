@@ -4,6 +4,7 @@ import com.example.mybudget.BuildConfig
 import com.example.mybudget.data.auth.TokenProvider
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -16,6 +17,12 @@ object HttpClients {
         ignoreUnknownKeys = true
         explicitNulls = false
     }
+
+    /**
+     * For the business APIs (see `authenticatedRetrofit`): nulls are sent, so that a PUT can clear a field
+     * (e.g. remove the category of an expense). The server only updates the fields present in the body.
+     */
+    val apiJson = Json(json) { explicitNulls = true }
 
     /** Base client, no auth. Used as-is for the `auth/...` endpoints. */
     fun base(): OkHttpClient = OkHttpClient.Builder()
@@ -34,15 +41,22 @@ object HttpClients {
         }
         .build()
 
-    /** Client for every other API: attaches the token and renews it automatically on 401. */
+    /**
+     * Client for every other API: attaches the token and renews it automatically on 401.
+     *
+     * It gets its own [Dispatcher]: requests waiting for a token refresh hold their dispatcher slot (5 per host),
+     * so if the refresh call (made with [base]) had to queue behind them, it would wait forever.
+     */
     fun authenticated(base: OkHttpClient, tokenProvider: TokenProvider): OkHttpClient = base.newBuilder()
+        .dispatcher(Dispatcher())
         .addInterceptor(AuthInterceptor(tokenProvider))
         .authenticator(TokenAuthenticator(tokenProvider))
         .build()
 
-    fun retrofit(client: OkHttpClient, baseUrl: String = BuildConfig.API_BASE_URL): Retrofit = Retrofit.Builder()
-        .baseUrl(baseUrl)
-        .client(client)
-        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
-        .build()
+    fun retrofit(client: OkHttpClient, baseUrl: String = BuildConfig.API_BASE_URL, json: Json = this.json): Retrofit =
+        Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .client(client)
+            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .build()
 }

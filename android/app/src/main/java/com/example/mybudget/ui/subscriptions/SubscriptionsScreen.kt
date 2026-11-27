@@ -39,17 +39,18 @@ import com.example.mybudget.ui.components.AmountField
 import com.example.mybudget.ui.components.CategoryBadge
 import com.example.mybudget.ui.components.DateField
 import com.example.mybudget.ui.components.DropdownField
+import com.example.mybudget.ui.components.LocalCategoryStyles
 import com.example.mybudget.ui.components.EmptyState
 import com.example.mybudget.ui.components.formatDay
 import com.example.mybudget.ui.components.formatMoney
 import com.example.mybudget.ui.components.toAmountOrNull
 import com.example.mybudget.ui.components.toAmountText
-import com.example.mybudget.ui.model.DefaultCategories
+import com.example.mybudget.ui.model.CurrencyConverter
 import com.example.mybudget.ui.model.Period
 import com.example.mybudget.ui.model.SupportedCurrencies
 import com.example.mybudget.ui.model.Subscription
 import com.example.mybudget.ui.model.daysUntilNext
-import com.example.mybudget.ui.model.monthlyEur
+import com.example.mybudget.ui.model.monthly
 import com.example.mybudget.ui.theme.DeepGreen
 import com.example.mybudget.ui.theme.Mint
 import androidx.compose.ui.graphics.Color
@@ -58,9 +59,11 @@ import java.time.LocalDate
 @Composable
 fun SubscriptionsScreen(
     subscriptions: List<Subscription>,
+    converter: CurrencyConverter,
     onClick: (Subscription) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val perMonth = subscriptions.sumOf { it.monthly(converter) }
     LazyColumn(
         modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
@@ -70,13 +73,22 @@ fun SubscriptionsScreen(
             Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = DeepGreen)) {
                 Column(Modifier.padding(20.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Your bills & subscriptions cost", style = MaterialTheme.typography.bodyMedium, color = Mint)
-                    Text(formatMoney(subscriptions.sumOf { it.monthlyEur() }, "EUR") + " / month", style = MaterialTheme.typography.headlineMedium, color = Color.White)
-                    Text("≈ ${formatMoney(subscriptions.sumOf { it.monthlyEur() } * 12, "EUR")} per year", style = MaterialTheme.typography.bodyMedium, color = Mint)
+                    Text(formatMoney(perMonth, converter.home) + " / month", style = MaterialTheme.typography.headlineMedium, color = Color.White)
+                    Text("≈ ${formatMoney(perMonth * 12, converter.home)} per year", style = MaterialTheme.typography.bodyMedium, color = Mint)
                 }
             }
         }
         if (subscriptions.isEmpty()) {
             item { EmptyState("No subscriptions yet", "Add Netflix, rent, phone plan… so nothing sneaks up on you.") }
+        } else {
+            item {
+                Text(
+                    "Each payment is added to your expenses automatically on its date.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                )
+            }
         }
         items(subscriptions.sortedBy { it.nextDate }, key = { it.id }) { sub ->
             Card(
@@ -99,7 +111,13 @@ fun SubscriptionsScreen(
                     }
                     Column(horizontalAlignment = Alignment.End) {
                         Text(formatMoney(sub.amount, sub.currency), style = MaterialTheme.typography.titleMedium)
-                        Text(sub.period.label.lowercase(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val period = sub.period.label.lowercase()
+                        Text(
+                            if (sub.currency == converter.home) period
+                            else "≈ ${formatMoney(converter.toHome(sub.amount, sub.currency), converter.home)} · $period",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -111,13 +129,14 @@ fun SubscriptionsScreen(
 @Composable
 fun SubscriptionEditorSheet(
     initial: Subscription?,
+    defaultCurrency: String,
     onSave: (Subscription) -> Unit,
     onDelete: ((Subscription) -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf(initial?.name.orEmpty()) }
     var amount by remember { mutableStateOf(initial?.amount?.toAmountText().orEmpty()) }
-    var currency by remember { mutableStateOf(initial?.currency ?: "EUR") }
+    var currency by remember { mutableStateOf(initial?.currency ?: defaultCurrency) }
     var category by remember { mutableStateOf(initial?.category ?: "Subscriptions") }
     var period by remember { mutableStateOf(initial?.period ?: Period.MONTHLY) }
     var nextDate by remember { mutableStateOf(initial?.nextDate ?: LocalDate.now().plusMonths(1)) }
@@ -132,10 +151,10 @@ fun SubscriptionEditorSheet(
             OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, isError = showErrors && name.isBlank(), modifier = Modifier.fillMaxWidth())
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AmountField(amount, { amount = it }, Modifier.weight(1.4f), isError = showErrors && amount.toAmountOrNull() == null)
-                DropdownField("Currency", currency, SupportedCurrencies, { it }, { currency = it ?: "EUR" }, Modifier.weight(1f))
+                DropdownField("Currency", currency, SupportedCurrencies, { it }, { currency = it ?: defaultCurrency }, Modifier.weight(1f))
             }
             DropdownField("Repeats", period, Period.entries, { it.label }, { period = it ?: Period.MONTHLY })
-            DropdownField("Category", category, DefaultCategories, { it }, { category = it ?: "Subscriptions" })
+            DropdownField("Category", category, LocalCategoryStyles.current.names, { it }, { category = it ?: "Subscriptions" })
             DateField("Next payment", nextDate, { nextDate = it })
             Spacer(Modifier.height(4.dp))
             Button(

@@ -24,14 +24,31 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.example.mybudget.data.auth.User
+import com.example.mybudget.ui.categories.CategoriesSection
+import com.example.mybudget.ui.components.AppLocale
+import com.example.mybudget.ui.components.DropdownField
+import com.example.mybudget.ui.model.CustomCategory
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import com.example.mybudget.ui.model.SupportedCurrencies
+import java.util.Currency
 
 @Composable
-fun ProfileScreen(user: User, onLogout: () -> Unit, modifier: Modifier = Modifier) {
+fun ProfileScreen(
+    user: User,
+    homeCurrency: String,
+    onHomeCurrencyChange: (String) -> Unit,
+    categories: List<CustomCategory>,
+    onCategoryClick: (CustomCategory) -> Unit,
+    onAddCategory: () -> Unit,
+    onLogout: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var confirm by remember { mutableStateOf(false) }
     val label = user.displayName?.takeIf { it.isNotBlank() } ?: user.email
 
     Column(
-        modifier.fillMaxSize().padding(24.dp),
+        modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -43,6 +60,21 @@ fun ProfileScreen(user: User, onLogout: () -> Unit, modifier: Modifier = Modifie
         }
         Text(label, style = MaterialTheme.typography.titleLarge)
         if (label != user.email) Text(user.email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(Modifier.fillMaxWidth().padding(top = 24.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            DropdownField(
+                label = "Main currency",
+                value = homeCurrency,
+                options = SupportedCurrencies,
+                display = { currencyLabel(it) },
+                onSelect = { it?.let(onHomeCurrencyChange) },
+            )
+            Text(
+                "Totals and budgets are shown in this currency. Each expense keeps the exchange rate of the day it was made.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        CategoriesSection(categories, onCategoryClick, onAddCategory, Modifier.padding(top = 16.dp))
         Box(Modifier.padding(top = 24.dp)) {
             OutlinedButton(onClick = { confirm = true }, modifier = Modifier.fillMaxWidth()) {
                 Text("Log out", color = MaterialTheme.colorScheme.error)
@@ -60,3 +92,7 @@ fun ProfileScreen(user: User, onLogout: () -> Unit, modifier: Modifier = Modifie
         )
     }
 }
+
+/** "KRW · South Korean Won". */
+private fun currencyLabel(code: String): String =
+    runCatching { "$code · ${Currency.getInstance(code).getDisplayName(AppLocale)}" }.getOrDefault(code)

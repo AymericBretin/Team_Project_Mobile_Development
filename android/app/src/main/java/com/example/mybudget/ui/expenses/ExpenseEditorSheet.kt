@@ -29,25 +29,29 @@ import androidx.compose.ui.unit.dp
 import com.example.mybudget.ui.components.AmountField
 import com.example.mybudget.ui.components.DateField
 import com.example.mybudget.ui.components.DropdownField
+import com.example.mybudget.ui.components.LocalCategoryStyles
 import com.example.mybudget.ui.components.toAmountOrNull
 import com.example.mybudget.ui.components.toAmountText
-import com.example.mybudget.ui.model.DefaultCategories
 import com.example.mybudget.ui.model.Expense
 import com.example.mybudget.ui.model.SupportedCurrencies
 import java.time.LocalDate
 
-/** Bottom sheet to add ([initial] == null) or edit an expense. Tags are typed comma separated. */
+/**
+ * Bottom sheet to add ([initial] == null) or edit an expense. Tags are typed comma separated.
+ * New expenses start in [defaultCurrency] (the currency of the latest expense: abroad, it's usually the local one).
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExpenseEditorSheet(
     initial: Expense?,
+    defaultCurrency: String,
     onSave: (Expense) -> Unit,
     onDelete: ((Expense) -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     var title by remember { mutableStateOf(initial?.title.orEmpty()) }
     var amount by remember { mutableStateOf(initial?.amount?.toAmountText().orEmpty()) }
-    var currency by remember { mutableStateOf(initial?.currency ?: "EUR") }
+    var currency by remember { mutableStateOf(initial?.currency ?: defaultCurrency) }
     var category by remember { mutableStateOf(initial?.category) }
     var tags by remember { mutableStateOf(initial?.tags?.joinToString(", ").orEmpty()) }
     var date by remember { mutableStateOf(initial?.date ?: LocalDate.now()) }
@@ -75,9 +79,9 @@ fun ExpenseEditorSheet(
             )
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AmountField(amount, { amount = it }, Modifier.weight(1.4f), isError = showErrors && amount.toAmountOrNull() == null)
-                DropdownField("Currency", currency, SupportedCurrencies, { it }, { currency = it ?: "EUR" }, Modifier.weight(1f))
+                DropdownField("Currency", currency, SupportedCurrencies, { it }, { currency = it ?: defaultCurrency }, Modifier.weight(1f))
             }
-            DropdownField("Category", category, DefaultCategories, { it }, { category = it }, allowNone = true, noneLabel = "No category")
+            DropdownField("Category", category, LocalCategoryStyles.current.names, { it }, { category = it }, allowNone = true, noneLabel = "No category")
             OutlinedTextField(
                 value = tags,
                 onValueChange = { tags = it },
