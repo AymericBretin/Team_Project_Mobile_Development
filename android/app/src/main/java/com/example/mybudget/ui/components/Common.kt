@@ -23,11 +23,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.example.mybudget.ui.model.CurrencyConverter
 import com.example.mybudget.ui.model.Expense
+import com.example.mybudget.ui.model.homeAmount
 
 @Composable
 fun CategoryBadge(category: String?, modifier: Modifier = Modifier) {
-    val color = categoryColor(category)
+    val styles = LocalCategoryStyles.current
+    val color = styles.color(category)
     Box(
         modifier = modifier
             .size(40.dp)
@@ -35,12 +38,13 @@ fun CategoryBadge(category: String?, modifier: Modifier = Modifier) {
             .background(color.copy(alpha = 0.18f)),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(categoryIcon(category), contentDescription = category, tint = color, modifier = Modifier.size(20.dp))
+        Icon(styles.icon(category), contentDescription = category, tint = color, modifier = Modifier.size(20.dp))
     }
 }
 
+/** One expense. When it was paid in another currency, also shows its value in the home currency. */
 @Composable
-fun ExpenseRow(expense: Expense, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
+fun ExpenseRow(expense: Expense, converter: CurrencyConverter, onClick: (() -> Unit)? = null, modifier: Modifier = Modifier) {
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -52,12 +56,25 @@ fun ExpenseRow(expense: Expense, onClick: (() -> Unit)? = null, modifier: Modifi
         CategoryBadge(expense.category)
         Column(Modifier.weight(1f)) {
             Text(expense.title, style = MaterialTheme.typography.titleMedium)
-            val sub = listOfNotNull(expense.category, expense.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" })
+            val sub = listOfNotNull(
+                expense.category,
+                "Recurring".takeIf { expense.subscriptionId != null },
+                expense.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
+            )
             if (sub.isNotEmpty()) {
                 Text(sub.joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Text("-" + formatMoney(expense.amount, expense.currency), style = MaterialTheme.typography.titleMedium)
+        Column(horizontalAlignment = Alignment.End) {
+            Text("-" + formatMoney(expense.amount, expense.currency), style = MaterialTheme.typography.titleMedium)
+            if (expense.currency != converter.home) {
+                Text(
+                    "≈ " + formatMoney(expense.homeAmount(converter), converter.home),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

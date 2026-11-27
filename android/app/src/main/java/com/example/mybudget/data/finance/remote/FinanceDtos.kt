@@ -1,6 +1,8 @@
 package com.example.mybudget.data.finance.remote
 
 import com.example.mybudget.ui.model.Budget
+import com.example.mybudget.ui.model.CurrencyConverter
+import com.example.mybudget.ui.model.CustomCategory
 import com.example.mybudget.ui.model.Expense
 import com.example.mybudget.ui.model.Period
 import com.example.mybudget.ui.model.Subscription
@@ -21,6 +23,10 @@ data class ExpenseDto(
     val category: String? = null,
     val tags: List<String> = emptyList(),
     val date: String,
+    /** Home-currency units for 1 unit of [currency] on [date], set by the server. Null until it could reach the rate API. */
+    val rate: Double? = null,
+    /** Set when the server created this expense by charging a subscription. */
+    val subscriptionId: Long? = null,
 )
 
 @Serializable
@@ -69,7 +75,32 @@ data class BudgetBody(
     val currency: String,
 )
 
-fun ExpenseDto.toModel() = Expense(id, title, amount, currency, category, tags, LocalDate.parse(date))
+@Serializable
+data class CategoryDto(val id: Long, val name: String, val color: String, val icon: String)
+
+@Serializable
+data class CategoryBody(val name: String, val color: String, val icon: String)
+
+fun CategoryDto.toModel() = CustomCategory(id, name, color, icon)
+
+fun CustomCategory.toDto() = CategoryDto(id, name, color, icon)
+
+fun CustomCategory.toBody() = CategoryBody(name, color, icon)
+
+/** `GET /me`, `PUT /me`. */
+@Serializable
+data class ProfileDto(val homeCurrency: String)
+
+@Serializable
+data class ProfileBody(val homeCurrency: String)
+
+/** `GET /rates`: today's rates, as [base] (home currency) units for 1 unit of each currency. */
+@Serializable
+data class RatesDto(val base: String, val rates: Map<String, Double>)
+
+fun ExpenseDto.toModel() = Expense(id, title, amount, currency, category, tags, LocalDate.parse(date), rate, subscriptionId)
+
+fun Expense.toDto() = ExpenseDto(id, title, amount, currency, category, tags, date.toString(), rate, subscriptionId)
 
 fun Expense.toBody() = ExpenseBody(title, amount, currency, category, tags, date.toString())
 
@@ -85,6 +116,12 @@ fun SubscriptionDto.toModel() = Subscription(
 
 fun Subscription.toBody() = SubscriptionBody(name, amount, currency, category, period.apiValue, nextDate.toString())
 
+fun Subscription.toDto() = SubscriptionDto(id, name, amount, currency, category, period.apiValue, nextDate.toString())
+
 fun BudgetDto.toModel() = Budget(id, category, amount, currency)
 
 fun Budget.toBody() = BudgetBody(category, amount, currency)
+
+fun Budget.toDto() = BudgetDto(id, category, amount, currency)
+
+fun RatesDto.toModel() = CurrencyConverter(base, rates)

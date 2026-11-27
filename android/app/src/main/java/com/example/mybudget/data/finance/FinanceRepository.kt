@@ -1,11 +1,13 @@
 package com.example.mybudget.data.finance
 
 import com.example.mybudget.ui.model.Budget
+import com.example.mybudget.ui.model.CurrencyConverter
+import com.example.mybudget.ui.model.CustomCategory
 import com.example.mybudget.ui.model.Expense
 import com.example.mybudget.ui.model.Subscription
 
 /**
- * Expenses, subscriptions and budgets of the signed-in user, stored on the server.
+ * Expenses, subscriptions, budgets and currency settings of the signed-in user, stored on the server.
  *
  * `save*` creates the item when its id is [NEW_ID] and updates it otherwise, and returns it as stored
  * by the server (with its real id).
@@ -22,6 +24,23 @@ interface FinanceRepository {
     suspend fun budgets(): DataResult<List<Budget>>
     suspend fun saveBudget(budget: Budget): DataResult<Budget>
     suspend fun deleteBudget(id: Long): DataResult<Unit>
+
+    suspend fun categories(): DataResult<List<CustomCategory>>
+
+    /** Renaming a category renames it everywhere it is used (expenses, subscriptions, budgets). */
+    suspend fun saveCategory(category: CustomCategory): DataResult<CustomCategory>
+
+    /** Its expenses and subscriptions become uncategorised, its budget is deleted. */
+    suspend fun deleteCategory(id: Long): DataResult<Unit>
+
+    /** The currency every total is shown in. */
+    suspend fun homeCurrency(): DataResult<String>
+
+    /** Changes the home currency. The server then converts every expense again, at the rate of its own date. */
+    suspend fun setHomeCurrency(currency: String): DataResult<String>
+
+    /** Today's exchange rates to the home currency. */
+    suspend fun rates(): DataResult<CurrencyConverter>
 
     companion object {
         /** Id of an item that is not on the server yet. */

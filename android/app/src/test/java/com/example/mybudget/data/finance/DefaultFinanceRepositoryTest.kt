@@ -5,6 +5,8 @@ import com.example.mybudget.data.finance.FinanceRepository.Companion.NEW_ID
 import com.example.mybudget.data.finance.remote.ExpenseDto
 import com.example.mybudget.data.finance.remote.SubscriptionDto
 import com.example.mybudget.ui.model.Budget
+import com.example.mybudget.ui.model.CurrencyConverter
+import com.example.mybudget.ui.model.CustomCategory
 import com.example.mybudget.ui.model.Expense
 import com.example.mybudget.ui.model.Period
 import com.example.mybudget.ui.model.Subscription
@@ -66,6 +68,35 @@ class DefaultFinanceRepositoryTest {
 
         assertEquals("weekly", api.subscriptions.single().period)
         assertEquals("2026-11-24", api.subscriptions.single().nextDate)
+    }
+
+    @Test
+    fun `expenses keep the rate of their day and the subscription that created them`() = runTest {
+        api.expenses += ExpenseDto(7, "Gym", 9000.0, "KRW", "Health", emptyList(), "2026-11-24", rate = 0.00068, subscriptionId = 3)
+
+        val expense = (repository.expenses() as DataResult.Success).data.single()
+
+        assertEquals(0.00068, expense.rate!!, 1e-12)
+        assertEquals(3L, expense.subscriptionId)
+    }
+
+    @Test
+    fun `reads and changes the home currency, rates are relative to it`() = runTest {
+        api.rates = mapOf("EUR" to 1.0, "KRW" to 0.00068)
+
+        assertEquals(DataResult.Success("EUR"), repository.homeCurrency())
+        assertEquals(DataResult.Success(CurrencyConverter("EUR", api.rates)), repository.rates())
+        assertEquals(DataResult.Success("KRW"), repository.setHomeCurrency("KRW"))
+        assertEquals(listOf("GET me", "GET rates", "PUT me"), api.calls)
+    }
+
+    @Test
+    fun `custom categories are created, then updated`() = runTest {
+        val created = (repository.saveCategory(CustomCategory(NEW_ID, "Pets", "amber", "pets")) as DataResult.Success).data
+        repository.saveCategory(created.copy(name = "Animals"))
+
+        assertEquals(listOf("POST categories", "PUT categories/${created.id}"), api.calls)
+        assertEquals(DataResult.Success(listOf(CustomCategory(created.id, "Animals", "amber", "pets"))), repository.categories())
     }
 
     @Test

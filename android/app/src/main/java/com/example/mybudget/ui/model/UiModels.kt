@@ -14,6 +14,10 @@ data class Expense(
     val category: String? = null,
     val tags: List<String> = emptyList(),
     val date: LocalDate = LocalDate.now(),
+    /** Home-currency units for 1 unit of [currency] on [date] (rate saved at purchase). Null while unknown. */
+    val rate: Double? = null,
+    /** The subscription this expense was charged for, if the server created it automatically. */
+    val subscriptionId: Long? = null,
 )
 
 data class Subscription(
@@ -40,9 +44,25 @@ data class Budget(
     val currency: String = "EUR",
 )
 
+/**
+ * A category the user created, on top of [DefaultCategories]. [color] and [icon] are keys of the app's palettes
+ * (see ui/components/Categories.kt), so the server never deals with UI values.
+ */
+data class CustomCategory(
+    val id: Long,
+    val name: String,
+    val color: String,
+    val icon: String,
+)
+
+/** Built-in categories, available to everyone. They can't be renamed or deleted. */
 val DefaultCategories = listOf(
     "Groceries", "Restaurant", "Transport", "Subscriptions",
     "Shopping", "Health", "Leisure", "Travel", "Other",
 )
 
-val SupportedCurrencies = listOf("EUR", "KRW", "USD", "GBP", "JPY")
+/** The currencies the exchange-rate API knows (ECB reference rates), the most used ones first. */
+val SupportedCurrencies = listOf("EUR", "KRW", "USD", "GBP", "JPY") + listOf(
+    "AUD", "BRL", "CAD", "CHF", "CNY", "CZK", "DKK", "HKD", "HUF", "IDR", "ILS", "INR", "ISK",
+    "MXN", "MYR", "NOK", "NZD", "PHP", "PLN", "RON", "SEK", "SGD", "THB", "TRY", "ZAR",
+)

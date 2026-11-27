@@ -38,27 +38,27 @@ import com.example.mybudget.ui.components.AmountField
 import com.example.mybudget.ui.components.BudgetBar
 import com.example.mybudget.ui.components.CategoryBadge
 import com.example.mybudget.ui.components.DropdownField
+import com.example.mybudget.ui.components.LocalCategoryStyles
 import com.example.mybudget.ui.components.EmptyState
 import com.example.mybudget.ui.components.formatMoney
 import com.example.mybudget.ui.components.toAmountOrNull
 import com.example.mybudget.ui.components.toAmountText
 import com.example.mybudget.ui.model.Budget
-import com.example.mybudget.ui.model.DefaultCategories
+import com.example.mybudget.ui.model.CurrencyConverter
 import com.example.mybudget.ui.model.Expense
 import com.example.mybudget.ui.model.SupportedCurrencies
-import com.example.mybudget.ui.model.amountEur
-import com.example.mybudget.ui.model.inMonth
-import com.example.mybudget.ui.model.totalEur
+import com.example.mybudget.ui.model.usage
 import java.time.YearMonth
 
 @Composable
 fun BudgetsScreen(
     budgets: List<Budget>,
     expenses: List<Expense>,
+    converter: CurrencyConverter,
     onClick: (Budget) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val monthExpenses = expenses.inMonth(YearMonth.now())
+    val month = YearMonth.now()
     LazyColumn(
         modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 88.dp),
@@ -66,9 +66,9 @@ fun BudgetsScreen(
     ) {
         if (budgets.isEmpty()) item { EmptyState("No budgets yet", "Set a monthly limit overall or per category.") }
         items(budgets.sortedBy { it.category != null }, key = { it.id }) { budget ->
-            val spent = if (budget.category == null) monthExpenses.totalEur()
-            else monthExpenses.filter { it.category == budget.category }.totalEur()
-            val progress = (spent / budget.amountEur()).toFloat()
+            val usage = budget.usage(expenses, month, converter)
+            val progress = usage.ratio.toFloat()
+            val spent = converter.fromHome(usage.spentHome, budget.currency)
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -78,13 +78,14 @@ fun BudgetsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CategoryBadge(budget.category)
                         Text(budget.category ?: "Monthly budget", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-                        Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelLarge, color = if (progress >= 1f) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("${(progress * 100).toInt()}%", style = MaterialTheme.typography.labelLarge, color = if (usage.isOver) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     BudgetBar(progress)
                     Text(
-                        "${formatMoney(spent, "EUR")} of ${formatMoney(budget.amount, budget.currency)}",
+                        "${formatMoney(spent, budget.currency)} of ${formatMoney(budget.amount, budget.currency)}" +
+                            if (usage.isOver) " · ${formatMoney(spent - budget.amount, budget.currency)} over" else "",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = if (usage.isOver) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -97,19 +98,20 @@ fun BudgetsScreen(
 fun BudgetEditorSheet(
     initial: Budget?,
     existing: List<Budget>,
+    defaultCurrency: String,
     onSave: (Budget) -> Unit,
     onDelete: ((Budget) -> Unit)?,
     onDismiss: () -> Unit,
 ) {
     var category by remember { mutableStateOf(initial?.category) }
     var amount by remember { mutableStateOf(initial?.amount?.toAmountText().orEmpty()) }
-    var currency by remember { mutableStateOf(initial?.currency ?: "EUR") }
+    var currency by remember { mutableStateOf(initial?.currency ?: defaultCurrency) }
     var showErrors by remember { mutableStateOf(false) }
 
     // One budget per category (and one global one): hide the ones already used when creating.
     val taken = existing.filter { it.id != initial?.id }.mapNotNull { it.category }.toSet()
     val globalTaken = existing.any { it.id != initial?.id && it.category == null }
-    val available = DefaultCategories.filterNot { it in taken }
+    val available = LocalCategoryStyles.current.names.filterNot { it in taken }
     val missingCategory = category == null && globalTaken
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
@@ -132,7 +134,7 @@ fun BudgetEditorSheet(
             }
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 AmountField(amount, { amount = it }, Modifier.weight(1.4f), isError = showErrors && amount.toAmountOrNull() == null)
-                DropdownField("Currency", currency, SupportedCurrencies, { it }, { currency = it ?: "EUR" }, Modifier.weight(1f))
+                DropdownField("Currency", currency, SupportedCurrencies, { it }, { currency = it ?: defaultCurrency }, Modifier.weight(1f))
             }
             Spacer(Modifier.height(4.dp))
             Button(

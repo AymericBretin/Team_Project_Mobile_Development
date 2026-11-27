@@ -8,7 +8,7 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 
 /**
- * Expenses, subscriptions and budgets of the signed-in user.
+ * Expenses, subscriptions, budgets and currency settings of the signed-in user.
  * Must be created from `authenticatedRetrofit`: the server answers 401 without a valid access token.
  */
 interface FinanceApi {
@@ -47,4 +47,28 @@ interface FinanceApi {
 
     @DELETE("budgets/{id}")
     suspend fun deleteBudget(@Path("id") id: Long)
+
+    @GET("categories")
+    suspend fun categories(): List<CategoryDto>
+
+    @POST("categories")
+    suspend fun createCategory(@Body body: CategoryBody): CategoryDto
+
+    /** Renaming also renames the category on every expense, subscription and budget using it. */
+    @PUT("categories/{id}")
+    suspend fun updateCategory(@Path("id") id: Long, @Body body: CategoryBody): CategoryDto
+
+    /** Its expenses and subscriptions become uncategorised, its budget is deleted. */
+    @DELETE("categories/{id}")
+    suspend fun deleteCategory(@Path("id") id: Long)
+
+    @GET("me")
+    suspend fun profile(): ProfileDto
+
+    /** Changing the home currency makes the server convert every expense again, at the rate of its own date. */
+    @PUT("me")
+    suspend fun updateProfile(@Body body: ProfileBody): ProfileDto
+
+    @GET("rates")
+    suspend fun rates(): RatesDto
 }

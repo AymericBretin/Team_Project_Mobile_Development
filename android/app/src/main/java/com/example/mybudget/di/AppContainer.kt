@@ -7,6 +7,8 @@ import com.example.mybudget.data.auth.local.EncryptedSessionStorage
 import com.example.mybudget.data.auth.remote.AuthApi
 import com.example.mybudget.data.finance.DefaultFinanceRepository
 import com.example.mybudget.data.finance.FinanceRepository
+import com.example.mybudget.data.finance.local.FileFinanceCache
+import com.example.mybudget.data.finance.local.FinanceCache
 import com.example.mybudget.data.finance.remote.FinanceApi
 import com.example.mybudget.data.network.HttpClients
 import retrofit2.Retrofit
@@ -43,4 +45,7 @@ class AppContainer(context: Context) {
         api = authenticatedRetrofit.create<FinanceApi>(),
         json = HttpClients.json,
     )
+
+    /** Last loaded data, shown offline. Not backed up, cleared on sign-out (see MyBudgetApplication). */
+    val financeCache: FinanceCache = FileFinanceCache(context.noBackupFilesDir, HttpClients.json)
 }

@@ -4,6 +4,7 @@ import com.example.mybudget.BuildConfig
 import com.example.mybudget.data.auth.TokenProvider
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.Dispatcher
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -40,8 +41,14 @@ object HttpClients {
         }
         .build()
 
-    /** Client for every other API: attaches the token and renews it automatically on 401. */
+    /**
+     * Client for every other API: attaches the token and renews it automatically on 401.
+     *
+     * It gets its own [Dispatcher]: requests waiting for a token refresh hold their dispatcher slot (5 per host),
+     * so if the refresh call (made with [base]) had to queue behind them, it would wait forever.
+     */
     fun authenticated(base: OkHttpClient, tokenProvider: TokenProvider): OkHttpClient = base.newBuilder()
+        .dispatcher(Dispatcher())
         .addInterceptor(AuthInterceptor(tokenProvider))
         .authenticator(TokenAuthenticator(tokenProvider))
         .build()

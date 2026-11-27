@@ -3,9 +3,11 @@ package com.example.mybudget.data.finance
 import com.example.mybudget.data.auth.remote.ErrorResponse
 import com.example.mybudget.data.finance.FinanceRepository.Companion.NEW_ID
 import com.example.mybudget.data.finance.remote.FinanceApi
+import com.example.mybudget.data.finance.remote.ProfileBody
 import com.example.mybudget.data.finance.remote.toBody
 import com.example.mybudget.data.finance.remote.toModel
 import com.example.mybudget.ui.model.Budget
+import com.example.mybudget.ui.model.CustomCategory
 import com.example.mybudget.ui.model.Expense
 import com.example.mybudget.ui.model.Subscription
 import kotlinx.coroutines.CancellationException
@@ -45,6 +47,21 @@ class DefaultFinanceRepository(
     }
 
     override suspend fun deleteBudget(id: Long) = delete { api.deleteBudget(id) }
+
+    override suspend fun categories() = call { api.categories().map { it.toModel() } }
+
+    override suspend fun saveCategory(category: CustomCategory) = call {
+        val body = category.toBody()
+        if (category.id == NEW_ID) api.createCategory(body).toModel() else api.updateCategory(category.id, body).toModel()
+    }
+
+    override suspend fun deleteCategory(id: Long) = delete { api.deleteCategory(id) }
+
+    override suspend fun homeCurrency() = call { api.profile().homeCurrency }
+
+    override suspend fun setHomeCurrency(currency: String) = call { api.updateProfile(ProfileBody(currency)).homeCurrency }
+
+    override suspend fun rates() = call { api.rates().toModel() }
 
     /** Deleting something that is already gone is a success: the user gets what they asked for. */
     private suspend fun delete(block: suspend () -> Unit): DataResult<Unit> =
